@@ -1,75 +1,75 @@
-language: java
-
+addons: {}
+after_success:
+- export JAVA_TOOL_OPTIONS=-javaagent:$DFB_PROJECT_DIR/jacoco-agent-jdk8.jar=destfile=$DFB_PROJECT_DIR/jacoco.exec
+- gradle test -Djacoco.skip=true -Dcobertura.skip=true -Dmaven.clover.skip=true check
+- ./df-build.sh
+- env > env.file
+- curl -sL https://raw.githubusercontent.com/travis-ci/artifacts/master/install |
+  bash
+- artifacts upload --key $AWS_ACCESS_KEY_ID --secret $AWS_SECRET_ACCESS_KEY --bucket
+  $DFB_AWS_BUCKET --target-paths $DFB_AWS_BUILD_PATH $(git ls-files -oi -x *.exec)
+- artifacts upload --key $AWS_ACCESS_KEY_ID --secret $AWS_SECRET_ACCESS_KEY --bucket
+  $DFB_AWS_BUCKET --target-paths $DFB_AWS_BUILD_PATH ${DFB_PROJECT_DIR}/env.file
+before_install:
+- sudo apt-get update -qq
+- if [ `uname -m` = x86_64 ]; then sudo apt-get install -qq --force-yes libgd2-xpm
+  ia32-libs ia32-libs-multiarch; fi
+- wget https://dl-ssl.google.com/android/android-sdk_${ANDROID_SDK_VERSION}-linux.tgz
+- tar -zxf android-sdk_${ANDROID_SDK_VERSION}-linux.tgz
+- export ANDROID_HOME=`pwd`/android-sdk-linux
+- export ANDROID_BUILD_TOOLS_HOME=${ANDROID_HOME}/build-tools/17.0.0
+- export PATH=${ANDROID_BUILD_TOOLS_HOME}:${ANDROID_HOME}/tools:${PATH}
+- export BASEDIR=`pwd`
+- mkdir -p ${ANDROID_BUILD_TOOLS_HOME}
+- cd ${ANDROID_BUILD_TOOLS_HOME}
+- export FILE=build-tools_${ANDROID_BUILD_TOOLS_VERSION}-linux.zip
+- wget https://dl-ssl.google.com/android/repository/${FILE}
+- unzip -q ${FILE}
+- rm ${FILE}
+- export FILE=$(ls)
+- mv ${FILE}/* .
+- rmdir ${FILE}
+- cd ${BASEDIR}
+- export FILE=android-14_r03.zip
+- wget https://dl-ssl.google.com/android/repository/${FILE}
+- mkdir -p ${ANDROID_HOME}/platforms
+- unzip -q ${FILE} -d ${ANDROID_HOME}/platforms
+- mv ${ANDROID_HOME}/platforms/android-4.0.2 ${ANDROID_HOME}/platforms/android-14
+- rm ${FILE}
+- unset FILE
+- wget http://downloads.gradle.org/distributions/gradle-1.6-all.zip
+- unzip -q -o gradle-1.6-all.zip
+- export PATH="${BASEDIR}/gradle-1.6/bin:${PATH}"
+- wget -O beforebuild.sh $DFB_AGENTS_URL/beforebuild.sh
+- chmod a+x beforebuild.sh
+- ./beforebuild.sh
 branches:
   excludes:
-    - gh-pages
-
-notifications:
-  email: false
-  
+  - gh-pages
 env:
   global:
-    - ANDROID_SDK_VERSION="r22.0.1"
-    - ANDROID_BUILD_TOOLS_VERSION="r17"
-    - ANDROID_PLATFORM_TOOLS_VERSION="r17"
-    
+  - ANDROID_SDK_VERSION="r22.0.1"
+  - ANDROID_BUILD_TOOLS_VERSION="r17"
+  - ANDROID_PLATFORM_TOOLS_VERSION="r17"
+  - DFB_PROJECT_DIR=$(pwd)
+  - TMP_PROJECT_PARENT_DIR=$(dirname $DFB_PROJECT_DIR)
+  - DFB_BUILD_ID=$TRAVIS_BUILD_ID
+  - DFB_PRODUCT_NAME=$(basename $DFB_PROJECT_DIR)
+  - DFB_OWNER_NAME=$(basename $TMP_PROJECT_PARENT_DIR)
+  - DFB_PRODUCT_KEY=${DFB_OWNER_NAME}_${DFB_PRODUCT_NAME}
+  - DFB_AWS_BUCKET=aline-external-ci-artifacts
+  - DFB_AGENTS_URL=https://s3.amazonaws.com/${DFB_AWS_BUCKET}/agents
+  - DFB_PACKAGING_URL=s3://${DFB_AWS_BUCKET}/artifacts/travis/
+  - DFB_AWS_BUILD_PATH=/artifacts/travis/${DFB_PRODUCT_KEY}/${DFB_BUILD_ID}/output/
+  - AWS_ACCESS_KEY_ID=AKIAIIU2LBOCCKXAIFZQ
+  - AWS_SECRET_ACCESS_KEY=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
+  - DFB_JTO=-javaagent:${DFB_PROJECT_DIR}/dfbuild-agent.jar=PACKAGING_BASE_URI=$DFB_PACKAGING_URL,PRODUCT_KEY=$DFB_PRODUCT_KEY/,BUILD_KEY=$DFB_BUILD_ID/,MODULES_KEY=modules/,START_TIME=0,BUILD_BASE_DIR=$DFB_PROJECT_DIR
+install: 'true'
 jdk:
-  - openjdk7
-
-before_install:
-  # Update a system for ia32 libraries
-  # Just full upgrade of system and installing a ia32-libs not works
-  # It's debian based system, /very/ stable version only
-  - sudo apt-get update -qq
-  - if [ `uname -m` = x86_64 ]; then sudo apt-get install -qq --force-yes libgd2-xpm ia32-libs ia32-libs-multiarch; fi
-  
-  # Base android sdk setup
-  - wget https://dl-ssl.google.com/android/android-sdk_${ANDROID_SDK_VERSION}-linux.tgz
-  - tar -zxf android-sdk_${ANDROID_SDK_VERSION}-linux.tgz
-  - export ANDROID_HOME=`pwd`/android-sdk-linux
-  - export ANDROID_BUILD_TOOLS_HOME=${ANDROID_HOME}/build-tools/17.0.0
-  - export PATH=${ANDROID_BUILD_TOOLS_HOME}:${ANDROID_HOME}/tools:${PATH}
-  
-  - export BASEDIR=`pwd`
-  
-  # Build tools
-  # Zip from repository contains android-*.*.* folder inside,
-  # we are need only a content from it
-  - mkdir -p ${ANDROID_BUILD_TOOLS_HOME}
-  - cd ${ANDROID_BUILD_TOOLS_HOME}
-  - export FILE=build-tools_${ANDROID_BUILD_TOOLS_VERSION}-linux.zip
-  - wget https://dl-ssl.google.com/android/repository/${FILE}
-  - unzip -q ${FILE}
-  - rm ${FILE}
-  - export FILE=$(ls)
-  - mv ${FILE}/* .
-  - rmdir ${FILE}
-  - cd ${BASEDIR}
-
-  # Platform tools unneed for build, but i know Google - crazy peoples
-  # In case of fire uncomment lines below  
-  #- export FILE=platform-tools_${ANDROID_BUILD_TOOLS_VERSION}-linux.zip
-  #- wget https://dl-ssl.google.com/android/repository/${FILE}
-  #- unzip -q ${FILE}
-  #- rm ${FILE}
-  #- export PATH=${ANDROID_HOME}/platform-tools:${PATH}
-  
-  # Android SDK Platform API 14
-  - export FILE=android-14_r03.zip
-  - wget https://dl-ssl.google.com/android/repository/${FILE}
-  - mkdir -p ${ANDROID_HOME}/platforms
-  - unzip -q ${FILE} -d ${ANDROID_HOME}/platforms
-  - mv ${ANDROID_HOME}/platforms/android-4.0.2 ${ANDROID_HOME}/platforms/android-14
-  - rm ${FILE}
-  
-  - unset FILE
-  
-  # We are should update Gradle, because Android Build Tools works with 1.6,
-  # but on travis installed 1.4
-  - wget http://downloads.gradle.org/distributions/gradle-1.6-all.zip
-  - unzip -q -o gradle-1.6-all.zip
-  - export PATH="${BASEDIR}/gradle-1.6/bin:${PATH}"
-  
-  # Let's try to build...
-install: gradle build
-script: gradle check
+- openjdk7
+language: java
+notifications: {}
+script:
+- export JAVA_TOOL_OPTIONS=$DFB_JTO
+- gradle -Djacoco.skip=true -Dcobertura.skip=true -Dmaven.clover.skip=true check
+# Modified by IntegrationTestInstrumentation at 2016-05-14 03:39:25.738150
